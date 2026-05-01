@@ -111,4 +111,4 @@ INSERT INTO exercises (id, name, tags, equipment_type, created_at) VALUES
   (uuid_generate_v4(), '腹肌機',         ARRAY['核心'],       '機械', NOW()),
   (uuid_generate_v4(), '轉體機',         ARRAY['核心'],       '機械', NOW()),
   (uuid_generate_v4(), '背部伸展機',     ARRAY['核心','背'],  '機械', NOW())
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (name) DO NOTHING;

@@ -50,7 +50,7 @@ async function syncExercises(): Promise<void> {
       equipment_type: ex.equipment_type ?? null,
       created_at: ex.created_at.toISOString(),
     })),
-    { onConflict: 'id' }
+    { onConflict: 'name' }
   );
 }
 

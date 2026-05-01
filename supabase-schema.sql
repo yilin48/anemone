@@ -7,7 +7,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Exercises table
 CREATE TABLE IF NOT EXISTS exercises (
   id UUID PRIMARY KEY,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   tags TEXT[] NOT NULL DEFAULT '{}',
   equipment_type TEXT CHECK (equipment_type IN ('槓鈴', '啞鈴', '纜繩', '機械')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
