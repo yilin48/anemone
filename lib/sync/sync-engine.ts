@@ -2,25 +2,37 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import {
   getUnsyncedWorkoutSets,
   markWorkoutSetAsSynced,
+  getAllExercises,
 } from '@/lib/db/operations';
 import { useSyncStore } from '@/lib/store/sync-store';
 
-// Sync interval (30 seconds)
 const SYNC_INTERVAL = 30000;
 
 let syncTimer: NodeJS.Timeout | null = null;
+
+async function syncExercises(): Promise<void> {
+  const exercises = await getAllExercises();
+  if (exercises.length === 0) return;
+
+  await supabase.from('exercises').upsert(
+    exercises.map((ex) => ({
+      id: ex.id,
+      name: ex.name,
+      created_at: ex.created_at.toISOString(),
+    })),
+    { onConflict: 'id' }
+  );
+}
 
 export async function syncWorkoutSets(): Promise<{
   success: boolean;
   syncedCount: number;
   error?: string;
 }> {
-  // Check if online
   if (!navigator.onLine) {
     return { success: false, syncedCount: 0, error: 'Offline' };
   }
 
-  // Check if Supabase is configured
   if (!isSupabaseConfigured()) {
     console.warn('⚠️ Supabase not configured, skipping sync');
     return { success: false, syncedCount: 0, error: 'Supabase not configured' };
@@ -31,7 +43,9 @@ export async function syncWorkoutSets(): Promise<{
   setIsSyncing(true);
 
   try {
-    // Get unsynced sets
+    // Sync exercises first to satisfy foreign key constraints
+    await syncExercises();
+
     const unsyncedSets = await getUnsyncedWorkoutSets();
 
     if (unsyncedSets.length === 0) {
@@ -41,8 +55,7 @@ export async function syncWorkoutSets(): Promise<{
 
     console.log(`🔄 Syncing ${unsyncedSets.length} workout sets...`);
 
-    // Upload to Supabase
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('workout_sets')
       .upsert(
         unsyncedSets.map((set) => ({
@@ -63,12 +76,10 @@ export async function syncWorkoutSets(): Promise<{
       return { success: false, syncedCount: 0, error: error.message };
     }
 
-    // Mark as synced in local DB
     await Promise.all(
       unsyncedSets.map((set) => markWorkoutSetAsSynced(set.id))
     );
 
-    // Update sync state
     decrementUnsyncedCount(unsyncedSets.length);
     useSyncStore.getState().setLastSyncTime(new Date());
 
@@ -92,15 +103,12 @@ export function startSyncEngine() {
 
   console.log('🚀 Starting sync engine...');
 
-  // Initial sync
   syncWorkoutSets();
 
-  // Periodic sync
   syncTimer = setInterval(() => {
     syncWorkoutSets();
   }, SYNC_INTERVAL);
 
-  // Sync when coming back online
   window.addEventListener('online', () => {
     console.log('🌐 Back online, syncing...');
     syncWorkoutSets();
@@ -115,7 +123,6 @@ export function stopSyncEngine() {
   }
 }
 
-// Auto-start sync engine on client
 if (typeof window !== 'undefined') {
   startSyncEngine();
 }
