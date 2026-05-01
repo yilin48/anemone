@@ -4,12 +4,16 @@ import type {
   WorkoutSet,
   WorkoutPlan,
   PlanExercise,
+  GymEquipment,
   CreateWorkoutSet,
   CreateExercise,
   CreateWorkoutPlan,
   CreatePlanExercise,
+  CreateGymEquipment,
   WorkoutSetWithExercise,
   WeightUnit,
+  MuscleGroup,
+  EquipmentType,
 } from './types';
 
 // ===== EXERCISES =====
@@ -27,6 +31,8 @@ export async function createExercise(data: CreateExercise): Promise<string> {
   await db.exercises.add({
     id,
     ...data,
+    tags: data.tags ?? [],
+    equipment_type: data.equipment_type ?? null,
     created_at: new Date(),
   });
   return id;
@@ -34,6 +40,19 @@ export async function createExercise(data: CreateExercise): Promise<string> {
 
 export async function deleteExercise(id: string): Promise<void> {
   await db.exercises.delete(id);
+}
+
+export async function updateExercise(
+  id: string,
+  name: string,
+  tags?: MuscleGroup[],
+  equipment_type?: EquipmentType | null
+): Promise<void> {
+  await db.exercises.update(id, {
+    name,
+    ...(tags !== undefined && { tags }),
+    ...(equipment_type !== undefined && { equipment_type }),
+  });
 }
 
 export async function searchExercises(query: string): Promise<Exercise[]> {
@@ -210,6 +229,30 @@ export async function reorderPlanExercises(
   });
 
   await Promise.all(updates.filter(Boolean));
+}
+
+// ===== GYM EQUIPMENT =====
+
+export async function getAllGymEquipment(): Promise<GymEquipment[]> {
+  return db.gym_equipment.toArray();
+}
+
+export async function createGymEquipment(data: CreateGymEquipment): Promise<string> {
+  const id = crypto.randomUUID();
+  await db.gym_equipment.add({ id, ...data, created_at: new Date() });
+  return id;
+}
+
+export async function deleteGymEquipment(id: string): Promise<void> {
+  await db.gym_equipment.delete(id);
+}
+
+export async function updateGymEquipmentPosition(
+  id: string,
+  grid_x: number,
+  grid_y: number
+): Promise<void> {
+  await db.gym_equipment.update(id, { grid_x, grid_y });
 }
 
 // ===== ANALYTICS =====

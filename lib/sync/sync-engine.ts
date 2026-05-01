@@ -4,11 +4,39 @@ import {
   markWorkoutSetAsSynced,
   getAllExercises,
 } from '@/lib/db/operations';
+import { db } from '@/lib/db';
 import { useSyncStore } from '@/lib/store/sync-store';
+import type { MuscleGroup, EquipmentType } from '@/lib/db/types';
 
 const SYNC_INTERVAL = 30000;
 
 let syncTimer: NodeJS.Timeout | null = null;
+
+export async function downloadExercisesFromSupabase(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const localCount = await db.exercises.count();
+  if (localCount > 0) return;
+
+  const { data, error } = await supabase
+    .from('exercises')
+    .select('*')
+    .order('name');
+
+  if (error || !data || data.length === 0) return;
+
+  await db.exercises.bulkAdd(
+    data.map((ex) => ({
+      id: ex.id,
+      name: ex.name,
+      tags: (ex.tags ?? []) as MuscleGroup[],
+      equipment_type: (ex.equipment_type ?? null) as EquipmentType | null,
+      created_at: new Date(ex.created_at),
+    }))
+  );
+
+  console.log(`✅ Downloaded ${data.length} exercises from Supabase`);
+}
 
 async function syncExercises(): Promise<void> {
   const exercises = await getAllExercises();
@@ -18,6 +46,8 @@ async function syncExercises(): Promise<void> {
     exercises.map((ex) => ({
       id: ex.id,
       name: ex.name,
+      tags: ex.tags ?? [],
+      equipment_type: ex.equipment_type ?? null,
       created_at: ex.created_at.toISOString(),
     })),
     { onConflict: 'id' }

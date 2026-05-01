@@ -21,6 +21,12 @@ export default function Home() {
             <Link href="/analytics" className="hover:opacity-80 pb-1">
               分析
             </Link>
+            <Link href="/map" className="hover:opacity-80 pb-1">
+              地圖
+            </Link>
+            <Link href="/exercises" className="hover:opacity-80 pb-1">
+              運動
+            </Link>
           </nav>
         </div>
       </header>
