@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { PRIndicator } from "@/components/PRIndicator/PRIndicator";
 import { SyncProvider } from "@/components/SyncProvider";
+import { SyncButton } from "@/components/SyncButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-gray-950">
         <SyncProvider />
         <PRIndicator />
+        <SyncButton />
         {children}
       </body>
     </html>

@@ -3,6 +3,8 @@ import {
   getUnsyncedWorkoutSets,
   markWorkoutSetAsSynced,
   getAllExercises,
+  getAllWorkoutPlans,
+  getAllGymEquipment,
 } from '@/lib/db/operations';
 import { db } from '@/lib/db';
 import { useSyncStore } from '@/lib/store/sync-store';
@@ -34,8 +36,6 @@ export async function downloadExercisesFromSupabase(): Promise<void> {
       created_at: new Date(ex.created_at),
     }))
   );
-
-  console.log(`✅ Downloaded ${data.length} exercises from Supabase`);
 }
 
 async function syncExercises(): Promise<void> {
@@ -54,6 +54,50 @@ async function syncExercises(): Promise<void> {
   );
 }
 
+async function syncWorkoutPlans(): Promise<void> {
+  const plans = await getAllWorkoutPlans();
+  if (plans.length > 0) {
+    await supabase.from('workout_plans').upsert(
+      plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        created_at: p.created_at.toISOString(),
+      })),
+      { onConflict: 'id' }
+    );
+  }
+
+  const planExercises = await db.plan_exercises.toArray();
+  if (planExercises.length === 0) return;
+
+  await supabase.from('plan_exercises').upsert(
+    planExercises.map((pe) => ({
+      id: pe.id,
+      plan_id: pe.plan_id,
+      exercise_id: pe.exercise_id,
+      order: pe.order,
+    })),
+    { onConflict: 'id' }
+  );
+}
+
+async function syncGymEquipment(): Promise<void> {
+  const equipment = await getAllGymEquipment();
+  if (equipment.length === 0) return;
+
+  await supabase.from('gym_equipment').upsert(
+    equipment.map((eq) => ({
+      id: eq.id,
+      name: eq.name,
+      exercise_id: eq.exercise_id,
+      grid_x: eq.grid_x,
+      grid_y: eq.grid_y,
+      created_at: eq.created_at.toISOString(),
+    })),
+    { onConflict: 'id' }
+  );
+}
+
 export async function syncWorkoutSets(): Promise<{
   success: boolean;
   syncedCount: number;
@@ -64,16 +108,13 @@ export async function syncWorkoutSets(): Promise<{
   }
 
   if (!isSupabaseConfigured()) {
-    console.warn('⚠️ Supabase not configured, skipping sync');
     return { success: false, syncedCount: 0, error: 'Supabase not configured' };
   }
 
   const { setIsSyncing, decrementUnsyncedCount } = useSyncStore.getState();
-
   setIsSyncing(true);
 
   try {
-    // Sync exercises first to satisfy foreign key constraints
     await syncExercises();
 
     const unsyncedSets = await getUnsyncedWorkoutSets();
@@ -82,8 +123,6 @@ export async function syncWorkoutSets(): Promise<{
       setIsSyncing(false);
       return { success: true, syncedCount: 0 };
     }
-
-    console.log(`🔄 Syncing ${unsyncedSets.length} workout sets...`);
 
     const { error } = await supabase
       .from('workout_sets')
@@ -101,24 +140,17 @@ export async function syncWorkoutSets(): Promise<{
       );
 
     if (error) {
-      console.error('❌ Sync error:', error);
       setIsSyncing(false);
       return { success: false, syncedCount: 0, error: error.message };
     }
 
-    await Promise.all(
-      unsyncedSets.map((set) => markWorkoutSetAsSynced(set.id))
-    );
-
+    await Promise.all(unsyncedSets.map((set) => markWorkoutSetAsSynced(set.id)));
     decrementUnsyncedCount(unsyncedSets.length);
     useSyncStore.getState().setLastSyncTime(new Date());
-
-    console.log(`✅ Synced ${unsyncedSets.length} workout sets`);
 
     setIsSyncing(false);
     return { success: true, syncedCount: unsyncedSets.length };
   } catch (error) {
-    console.error('❌ Sync error:', error);
     setIsSyncing(false);
     return {
       success: false,
@@ -128,10 +160,37 @@ export async function syncWorkoutSets(): Promise<{
   }
 }
 
+export async function fullSync(): Promise<{ success: boolean; error?: string }> {
+  if (!navigator.onLine) return { success: false, error: 'Offline' };
+  if (!isSupabaseConfigured()) return { success: false, error: 'Supabase not configured' };
+
+  const { setIsSyncing, setLastSyncTime, setUnsyncedCount } = useSyncStore.getState();
+  setIsSyncing(true);
+
+  try {
+    // exercises first — other tables have FK deps on it
+    await syncExercises();
+    await Promise.all([
+      syncWorkoutSets(),
+      syncWorkoutPlans(),
+      syncGymEquipment(),
+    ]);
+
+    setLastSyncTime(new Date());
+    setUnsyncedCount(0);
+    setIsSyncing(false);
+    return { success: true };
+  } catch (error) {
+    setIsSyncing(false);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
 export function startSyncEngine() {
   if (typeof window === 'undefined') return;
-
-  console.log('🚀 Starting sync engine...');
 
   syncWorkoutSets();
 
@@ -140,7 +199,6 @@ export function startSyncEngine() {
   }, SYNC_INTERVAL);
 
   window.addEventListener('online', () => {
-    console.log('🌐 Back online, syncing...');
     syncWorkoutSets();
   });
 }
@@ -149,7 +207,6 @@ export function stopSyncEngine() {
   if (syncTimer) {
     clearInterval(syncTimer);
     syncTimer = null;
-    console.log('⏹️ Sync engine stopped');
   }
 }
 
