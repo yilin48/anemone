@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm run build:*)",
       "Bash(rtk ls *)",
-      "Bash(rtk read *)"
+      "Bash(rtk read *)",
+      "Bash(rtk find *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk tsc *)"
     ],
     "deny": [],
     "ask": []

@@ -98,11 +98,7 @@ ALTER TABLE gym_equipment ENABLE ROW LEVEL SECURITY;
 -- Create policies for anonymous access (v1 only)
 -- WARNING: This allows anyone to read/write data. Use only for testing!
 
-CREATE POLICY "Allow anonymous read exercises" ON exercises
-  FOR SELECT USING (true);
-
-CREATE POLICY "Allow anonymous insert exercises" ON exercises
-  FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow all" ON exercises FOR ALL USING (true) WITH CHECK (true);
 
 CREATE POLICY "Allow anonymous read workout_sets" ON workout_sets
   FOR SELECT USING (true);
