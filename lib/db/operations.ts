@@ -4,11 +4,15 @@ import type {
   WorkoutSet,
   WorkoutPlan,
   PlanExercise,
+  GymZone,
   GymEquipment,
+  GymEquipmentWithExercises,
+  GymWalkway,
   CreateWorkoutSet,
   CreateExercise,
   CreateWorkoutPlan,
   CreatePlanExercise,
+  CreateGymZone,
   CreateGymEquipment,
   WorkoutSetWithExercise,
   WeightUnit,
@@ -231,19 +235,108 @@ export async function reorderPlanExercises(
   await Promise.all(updates.filter(Boolean));
 }
 
+// ===== GYM ZONES =====
+
+export async function getAllGymZones(): Promise<GymZone[]> {
+  return db.gym_zones.orderBy('order').toArray();
+}
+
+export async function createGymZone(data: CreateGymZone): Promise<string> {
+  const id = crypto.randomUUID();
+  await db.gym_zones.add({ id, ...data, created_at: new Date() });
+  return id;
+}
+
+export async function updateGymZone(id: string, data: Partial<Pick<GymZone, 'name' | 'cols' | 'rows'>>): Promise<void> {
+  await db.gym_zones.update(id, data);
+}
+
+export async function deleteGymZone(id: string): Promise<void> {
+  const equipment = await db.gym_equipment.where('zone_id').equals(id).toArray();
+  for (const eq of equipment) {
+    const junctions = await db.gym_equipment_exercises.where('equipment_id').equals(eq.id).toArray();
+    await db.gym_equipment_exercises.bulkDelete(junctions.map((j) => j.id));
+  }
+  await db.gym_equipment.where('zone_id').equals(id).delete();
+  const walkways = await db.gym_walkways.where('zone_id').equals(id).toArray();
+  await db.gym_walkways.bulkDelete(walkways.map((w) => w.id));
+  await db.gym_zones.delete(id);
+}
+
+export async function getZoneEquipmentCount(zone_id: string): Promise<number> {
+  return db.gym_equipment.where('zone_id').equals(zone_id).count();
+}
+
 // ===== GYM EQUIPMENT =====
 
 export async function getAllGymEquipment(): Promise<GymEquipment[]> {
   return db.gym_equipment.toArray();
 }
 
+export async function getZoneEquipmentWithExercises(zone_id: string): Promise<GymEquipmentWithExercises[]> {
+  const equipment = await db.gym_equipment.where('zone_id').equals(zone_id).toArray();
+  return Promise.all(
+    equipment.map(async (eq) => {
+      const junctions = await db.gym_equipment_exercises
+        .where('equipment_id')
+        .equals(eq.id)
+        .toArray();
+      const exercises = (
+        await Promise.all(junctions.map((j) => db.exercises.get(j.exercise_id)))
+      ).filter((ex): ex is Exercise => ex !== undefined);
+      return { ...eq, exercises };
+    })
+  );
+}
+
+export async function getAllGymEquipmentWithExercises(): Promise<GymEquipmentWithExercises[]> {
+  const equipment = await db.gym_equipment.toArray();
+  return Promise.all(
+    equipment.map(async (eq) => {
+      const junctions = await db.gym_equipment_exercises
+        .where('equipment_id')
+        .equals(eq.id)
+        .toArray();
+      const exercises = (
+        await Promise.all(junctions.map((j) => db.exercises.get(j.exercise_id)))
+      ).filter((ex): ex is Exercise => ex !== undefined);
+      return { ...eq, exercises };
+    })
+  );
+}
+
 export async function createGymEquipment(data: CreateGymEquipment): Promise<string> {
   const id = crypto.randomUUID();
-  await db.gym_equipment.add({ id, ...data, created_at: new Date() });
+  await db.gym_equipment.add({ id, name: data.name, zone_id: data.zone_id, grid_x: data.grid_x, grid_y: data.grid_y, created_at: new Date() });
+  await db.gym_equipment_exercises.add({
+    id: crypto.randomUUID(),
+    equipment_id: id,
+    exercise_id: data.exercise_id,
+  });
   return id;
 }
 
+export async function addExerciseToEquipment(equipment_id: string, exercise_id: string): Promise<void> {
+  const existing = await db.gym_equipment_exercises
+    .where('equipment_id').equals(equipment_id)
+    .and((j) => j.exercise_id === exercise_id)
+    .first();
+  if (!existing) {
+    await db.gym_equipment_exercises.add({ id: crypto.randomUUID(), equipment_id, exercise_id });
+  }
+}
+
+export async function removeExerciseFromEquipment(equipment_id: string, exercise_id: string): Promise<void> {
+  const record = await db.gym_equipment_exercises
+    .where('equipment_id').equals(equipment_id)
+    .and((j) => j.exercise_id === exercise_id)
+    .first();
+  if (record) await db.gym_equipment_exercises.delete(record.id);
+}
+
 export async function deleteGymEquipment(id: string): Promise<void> {
+  const junctions = await db.gym_equipment_exercises.where('equipment_id').equals(id).toArray();
+  await db.gym_equipment_exercises.bulkDelete(junctions.map((j) => j.id));
   await db.gym_equipment.delete(id);
 }
 
@@ -253,6 +346,26 @@ export async function updateGymEquipmentPosition(
   grid_y: number
 ): Promise<void> {
   await db.gym_equipment.update(id, { grid_x, grid_y });
+}
+
+// ===== GYM WALKWAYS =====
+
+export async function getAllGymWalkways(): Promise<GymWalkway[]> {
+  return db.gym_walkways.toArray();
+}
+
+export async function getZoneWalkways(zone_id: string): Promise<GymWalkway[]> {
+  return db.gym_walkways.where('zone_id').equals(zone_id).toArray();
+}
+
+export async function createGymWalkway(zone_id: string, grid_x: number, grid_y: number): Promise<string> {
+  const id = crypto.randomUUID();
+  await db.gym_walkways.add({ id, zone_id, grid_x, grid_y, created_at: new Date() });
+  return id;
+}
+
+export async function deleteGymWalkway(id: string): Promise<void> {
+  await db.gym_walkways.delete(id);
 }
 
 // ===== ANALYTICS =====

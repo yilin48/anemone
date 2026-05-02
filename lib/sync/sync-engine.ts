@@ -5,6 +5,8 @@ import {
   getAllExercises,
   getAllWorkoutPlans,
   getAllGymEquipment,
+  getAllGymWalkways,
+  getAllGymZones,
 } from '@/lib/db/operations';
 import { db } from '@/lib/db';
 import { useSyncStore } from '@/lib/store/sync-store';
@@ -82,20 +84,61 @@ async function syncWorkoutPlans(): Promise<void> {
 }
 
 async function syncGymEquipment(): Promise<void> {
-  const equipment = await getAllGymEquipment();
-  if (equipment.length === 0) return;
+  const zones = await getAllGymZones();
+  if (zones.length > 0) {
+    await supabase.from('gym_zones').upsert(
+      zones.map((z) => ({
+        id: z.id,
+        name: z.name,
+        cols: z.cols,
+        rows: z.rows,
+        order: z.order,
+        created_at: z.created_at.toISOString(),
+      })),
+      { onConflict: 'id' }
+    );
+  }
 
-  await supabase.from('gym_equipment').upsert(
-    equipment.map((eq) => ({
-      id: eq.id,
-      name: eq.name,
-      exercise_id: eq.exercise_id,
-      grid_x: eq.grid_x,
-      grid_y: eq.grid_y,
-      created_at: eq.created_at.toISOString(),
-    })),
-    { onConflict: 'id' }
-  );
+  const equipment = await getAllGymEquipment();
+  if (equipment.length > 0) {
+    await supabase.from('gym_equipment').upsert(
+      equipment.map((eq) => ({
+        id: eq.id,
+        name: eq.name,
+        zone_id: eq.zone_id,
+        grid_x: eq.grid_x,
+        grid_y: eq.grid_y,
+        created_at: eq.created_at.toISOString(),
+      })),
+      { onConflict: 'id' }
+    );
+  }
+
+  const junctions = await db.gym_equipment_exercises.toArray();
+  if (junctions.length > 0) {
+    await supabase.from('gym_equipment_exercises').upsert(
+      junctions.map((j) => ({
+        id: j.id,
+        equipment_id: j.equipment_id,
+        exercise_id: j.exercise_id,
+      })),
+      { onConflict: 'id' }
+    );
+  }
+
+  const walkways = await getAllGymWalkways();
+  if (walkways.length > 0) {
+    await supabase.from('gym_walkways').upsert(
+      walkways.map((w) => ({
+        id: w.id,
+        zone_id: w.zone_id,
+        grid_x: w.grid_x,
+        grid_y: w.grid_y,
+        created_at: w.created_at.toISOString(),
+      })),
+      { onConflict: 'id' }
+    );
+  }
 }
 
 export async function syncWorkoutSets(): Promise<{

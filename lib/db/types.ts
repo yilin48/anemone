@@ -48,16 +48,46 @@ export interface PlanExerciseWithDetails extends PlanExercise {
   exercise?: Exercise;
 }
 
+export interface GymZone {
+  id: string;
+  name: string;
+  cols: number;
+  rows: number;
+  order: number;
+  created_at: Date;
+}
+
 export interface GymEquipment {
   id: string;
   name: string;
-  exercise_id: string;
+  zone_id: string;
+  exercise_id?: string; // legacy field, use gym_equipment_exercises instead
   grid_x: number;
   grid_y: number;
   created_at: Date;
 }
 
-export type CreateGymEquipment = Omit<GymEquipment, 'id' | 'created_at'>;
+export interface GymEquipmentExercise {
+  id: string;
+  equipment_id: string;
+  exercise_id: string;
+}
+
+export interface GymEquipmentWithExercises extends GymEquipment {
+  exercises: Exercise[];
+}
+
+export interface GymWalkway {
+  id: string;
+  zone_id: string;
+  grid_x: number;
+  grid_y: number;
+  created_at: Date;
+}
+
+export type CreateGymZone = { name: string; cols: number; rows: number; order: number };
+export type CreateGymEquipment = { name: string; exercise_id: string; zone_id: string; grid_x: number; grid_y: number };
+export type CreateGymWalkway = { zone_id: string; grid_x: number; grid_y: number };
 
 // Helper types for creating records
 export type CreateWorkoutSet = Omit<WorkoutSet, 'id' | 'created_at' | 'synced'>;

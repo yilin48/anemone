@@ -196,7 +196,7 @@ export function WorkoutLogger() {
           </div>
 
           {/* Reps Input */}
-          <div>
+          <div className="space-y-2">
             <Input
               type="number"
               inputMode="numeric"
@@ -205,6 +205,21 @@ export function WorkoutLogger() {
               onChange={(e) => setCurrentReps(Number(e.target.value))}
               className="text-center text-2xl font-bold"
             />
+            <div className="grid grid-cols-4 gap-1.5">
+              {[1, 2, 3, 4].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setCurrentReps(n)}
+                  className={`py-1.5 rounded-lg text-sm font-semibold border transition-colors ${
+                    currentReps === n
+                      ? 'bg-white text-black border-white'
+                      : 'bg-transparent text-gray-400 border-gray-600 hover:border-gray-400 hover:text-white'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Action Buttons */}

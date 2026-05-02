@@ -40,14 +40,42 @@ CREATE TABLE IF NOT EXISTS plan_exercises (
   UNIQUE(plan_id, exercise_id)
 );
 
+-- Gym zones table
+CREATE TABLE IF NOT EXISTS gym_zones (
+  id UUID PRIMARY KEY,
+  name TEXT NOT NULL,
+  cols INTEGER NOT NULL DEFAULT 6,
+  rows INTEGER NOT NULL DEFAULT 5,
+  "order" INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Gym equipment table
 CREATE TABLE IF NOT EXISTS gym_equipment (
   id UUID PRIMARY KEY,
   name TEXT NOT NULL,
-  exercise_id UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+  zone_id UUID NOT NULL REFERENCES gym_zones(id) ON DELETE CASCADE,
   grid_x INTEGER NOT NULL,
   grid_y INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Equipment-exercise junction table (one machine can have multiple exercises)
+CREATE TABLE IF NOT EXISTS gym_equipment_exercises (
+  id UUID PRIMARY KEY,
+  equipment_id UUID NOT NULL REFERENCES gym_equipment(id) ON DELETE CASCADE,
+  exercise_id UUID NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+  UNIQUE(equipment_id, exercise_id)
+);
+
+-- Gym walkways table
+CREATE TABLE IF NOT EXISTS gym_walkways (
+  id UUID PRIMARY KEY,
+  zone_id UUID NOT NULL REFERENCES gym_zones(id) ON DELETE CASCADE,
+  grid_x INTEGER NOT NULL,
+  grid_y INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(zone_id, grid_x, grid_y)
 );
 
 -- Create indexes for better query performance
@@ -97,7 +125,16 @@ CREATE POLICY "Allow anonymous read plan_exercises" ON plan_exercises
 CREATE POLICY "Allow anonymous insert plan_exercises" ON plan_exercises
   FOR INSERT WITH CHECK (true);
 
+ALTER TABLE gym_zones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON gym_zones FOR ALL USING (true) WITH CHECK (true);
+
 CREATE POLICY "Allow all" ON gym_equipment FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE gym_equipment_exercises ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON gym_equipment_exercises FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE gym_walkways ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON gym_walkways FOR ALL USING (true) WITH CHECK (true);
 
 -- Show tables
 SELECT 'Schema created successfully!' as status;
